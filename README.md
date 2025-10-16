@@ -42,3 +42,13 @@
 
 # --- FILE: /config/dashboards/calibration-dashboard.yaml ---
 # Paste the content below into /config/dashboards/calibration-dashboard.yaml (uncommented)
+
+
+
+cd /config
+mkdir -p packages dashboards
+git clone https://github.com/Nistoras/ha-calibration-card.git tmp_cal
+cp -f tmp_cal/calibration_package.yaml packages/
+cp -f tmp_cal/calibration-dashboard.yaml dashboards/
+rm -rf tmp_cal
+ha core restart
