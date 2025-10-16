@@ -1,0 +1,444 @@
+homeassistant:
+  customize: {}
+
+# -------------------------------
+# INPUTS / HELPERS (generic)
+# -------------------------------
+input_select:
+  cal_location:
+    name: Calibration – Location
+    options:
+      - Kitchen – Window Corner
+      - Living – Window Plane
+      - Bedroom – Wardrobe Back
+    initial: Kitchen – Window Corner
+    icon: mdi:map-marker
+
+input_text:
+  cal_locations_store:
+    name: Calibration – Locations (JSON store)
+    # JSON dict of locations → {k, w, source, updated, history: []}
+    max: 65535
+  cal_surface_mode:
+    name: Calibration – Mode (laser|preset)
+    initial: laser
+  cal_surface_preset:
+    name: Calibration – Surface Preset (k)
+    initial: double_glazed_old
+  cal_mount_preset:
+    name: Calibration – Mount Preset (w)
+    initial: stick_tight
+  cal_entity_ti:
+    name: Calibration – Entity ID for Ti (optional)
+    initial: ""
+  cal_entity_te:
+    name: Calibration – Entity ID for Te (optional)
+    initial: ""
+  cal_entity_rh:
+    name: Calibration – Entity ID for RH (optional)
+    initial: ""
+  cal_entity_tstick:
+    name: Calibration – Entity ID for T_stick (optional)
+    initial: ""
+  cal_entity_tir:
+    name: Calibration – Entity ID for T_IR (optional)
+    initial: ""
+
+input_number:
+  cal_lambda:
+    name: Calibration – EMA λ
+    min: 0.05
+    max: 0.5
+    step: 0.05
+    mode: slider
+    initial: 0.20
+  cal_ti_manual:
+    name: Manual – Ti (°C)
+    min: -30
+    max: 50
+    step: 0.1
+    initial: 21
+    unit_of_measurement: '°C'
+  cal_te_manual:
+    name: Manual – Te (°C)
+    min: -50
+    max: 50
+    step: 0.1
+    initial: 3
+    unit_of_measurement: '°C'
+  cal_rh_manual:
+    name: Manual – RH (%)
+    min: 0
+    max: 100
+    step: 1
+    initial: 60
+    unit_of_measurement: '%'
+  cal_tstick_manual:
+    name: Manual – T_stick (°C)
+    min: -30
+    max: 50
+    step: 0.1
+    initial: 17.8
+    unit_of_measurement: '°C'
+  cal_tir_manual:
+    name: Manual – T_IR (°C)
+    min: -30
+    max: 50
+    step: 0.1
+    initial: 14.7
+    unit_of_measurement: '°C'
+  cal_k_current:
+    name: Stored k (current)
+    min: 0
+    max: 1
+    step: 0.001
+    initial: 0.40
+  cal_w_current:
+    name: Stored w (current)
+    min: 0
+    max: 1
+    step: 0.001
+    initial: 0.80
+
+input_text:
+  cal_source_k:
+    name: Source of k (laser|preset)
+  cal_source_w:
+    name: Source of w (laser|preset)
+  cal_last_update:
+    name: Last calibration timestamp
+
+# pseudo-buttons
+input_boolean:
+  cal_btn_calculate:
+    name: CALCULATE (k, w)
+    icon: mdi:calculator-variant
+  cal_btn_save:
+    name: SAVE to Location
+    icon: mdi:content-save
+  cal_btn_reset_location:
+    name: RESET Location
+    icon: mdi:backup-restore
+
+# ---------------------------------------------
+# SURFACE TYPE PRESETS (k) & MOUNT PRESETS (w)
+# ---------------------------------------------
+# Implemented as template sensors that map preset keys to numeric values.
+# Keys for cal_surface_preset:
+#   single_glazed | double_glazed_old | double_glazed_modern_low_e | double_glazed_excellent | triple_glazed
+#   exterior_wall_uninsulated | exterior_wall_insulated | cold_corner_uninsulated | behind_wardrobe_cold_wall
+# Keys for cal_mount_preset:
+#   stick_tight | stick_pad | in_air
+
+sensor:
+  - platform: template
+    sensors:
+      cal_preset_k_value:
+        friendly_name: "Preset k value"
+        unit_of_measurement: "k"
+        value_template: >-
+          {% set key = states('input_text.cal_surface_preset') %}
+          {% set map = {
+            'single_glazed': 0.60,
+            'double_glazed_old': 0.41,
+            'double_glazed_modern_low_e': 0.32,
+            'double_glazed_excellent': 0.25,
+            'triple_glazed': 0.18,
+            'exterior_wall_uninsulated': 0.24,
+            'exterior_wall_insulated': 0.14,
+            'cold_corner_uninsulated': 0.42,
+            'behind_wardrobe_cold_wall': 0.38
+          } %}
+          {{ map.get(key, 0.32) }}
+      cal_preset_w_value:
+        friendly_name: "Preset w value"
+        unit_of_measurement: "w"
+        value_template: >-
+          {% set key = states('input_text.cal_mount_preset') %}
+          {% set map = {
+            'stick_tight': 0.85,
+            'stick_pad': 0.65,
+            'in_air': 0.20
+          } %}
+          {{ map.get(key, 0.75) }}
+
+# ---------------------------------------------
+# INPUT RESOLUTION (entity-or-manual for each)
+# ---------------------------------------------
+  - platform: template
+    sensors:
+      cal_ti_resolved:
+        friendly_name: "Resolved Ti"
+        unit_of_measurement: '°C'
+        value_template: >-
+          {% set e = states('input_text.cal_entity_ti') %}
+          {% if e and states(e) not in [None, 'unknown', 'unavailable', ''] %}
+            {{ states(e) | float( default= states('input_number.cal_ti_manual') | float ) }}
+          {% else %}
+            {{ states('input_number.cal_ti_manual') | float }}
+          {% endif %}
+      cal_te_resolved:
+        friendly_name: "Resolved Te"
+        unit_of_measurement: '°C'
+        value_template: >-
+          {% set e = states('input_text.cal_entity_te') %}
+          {% if e and states(e) not in [None, 'unknown', 'unavailable', ''] %}
+            {{ states(e) | float( default= states('input_number.cal_te_manual') | float ) }}
+          {% else %}
+            {{ states('input_number.cal_te_manual') | float }}
+          {% endif %}
+      cal_rh_resolved:
+        friendly_name: "Resolved RH (%)"
+        unit_of_measurement: '%'
+        value_template: >-
+          {% set e = states('input_text.cal_entity_rh') %}
+          {% if e and states(e) not in [None, 'unknown', 'unavailable', ''] %}
+            {{ states(e) | float( default= states('input_number.cal_rh_manual') | float ) }}
+          {% else %}
+            {{ states('input_number.cal_rh_manual') | float }}
+          {% endif %}
+      cal_tstick_resolved:
+        friendly_name: "Resolved T_stick"
+        unit_of_measurement: '°C'
+        value_template: >-
+          {% set e = states('input_text.cal_entity_tstick') %}
+          {% if e and states(e) not in [None, 'unknown', 'unavailable', ''] %}
+            {{ states(e) | float( default= states('input_number.cal_tstick_manual') | float ) }}
+          {% else %}
+            {{ states('input_number.cal_tstick_manual') | float }}
+          {% endif %}
+      cal_tir_resolved:
+        friendly_name: "Resolved T_IR"
+        unit_of_measurement: '°C'
+        value_template: >-
+          {% set e = states('input_text.cal_entity_tir') %}
+          {% if e and states(e) not in [None, 'unknown', 'unavailable', ''] %}
+            {{ states(e) | float( default= states('input_number.cal_tir_manual') | float ) }}
+          {% else %}
+            {{ states('input_number.cal_tir_manual') | float }}
+          {% endif %}
+
+# ---------------------------------------------
+# CALCULATED METRICS (Laser & Derived)
+# ---------------------------------------------
+  - platform: template
+    sensors:
+      cal_k_meas:
+        friendly_name: "k_meas (from IR)"
+        unit_of_measurement: 'k'
+        value_template: >-
+          {% set Ti = states('sensor.cal_ti_resolved') | float %}
+          {% set Te = states('sensor.cal_te_resolved') | float %}
+          {% set TIR = states('sensor.cal_tir_resolved') | float %}
+          {% set dt = (Ti - Te) %}
+          {% if dt | abs < 5 or (Ti - TIR) | abs < 0.3 %}
+            unknown
+          {% else %}
+            {{ ((Ti - TIR) / dt) | round(3) }}
+          {% endif %}
+      cal_w_meas:
+        friendly_name: "w_meas (from IR)"
+        unit_of_measurement: 'w'
+        value_template: >-
+          {% set Ti = states('sensor.cal_ti_resolved') | float %}
+          {% set TIR = states('sensor.cal_tir_resolved') | float %}
+          {% set Tstick = states('sensor.cal_tstick_resolved') | float %}
+          {% set denom = (TIR - Ti) %}
+          {% if denom | abs < 0.3 %}
+            unknown
+          {% else %}
+            {{ ((Tstick - Ti) / denom) | round(3) }}
+          {% endif %}
+
+      cal_surface_guess:
+        friendly_name: "Surface guess from k_meas"
+        value_template: >-
+          {% set k = states('sensor.cal_k_meas') | float( default= -1 ) %}
+          {% if k == -1 %}unknown{% else %}
+            {% if 0.55 <= k <= 0.65 %}single_glazed
+            {% elif 0.38 <= k <= 0.45 %}double_glazed_old
+            {% elif 0.28 <= k <= 0.35 %}double_glazed_modern_low_e
+            {% elif 0.22 <= k <= 0.27 %}double_glazed_excellent
+            {% elif 0.15 <= k <= 0.20 %}triple_glazed
+            {% elif 0.35 <= k <= 0.50 %}cold_corner_uninsulated
+            {% elif 0.30 <= k <= 0.45 %}behind_wardrobe_cold_wall
+            {% elif 0.18 <= k <= 0.30 %}exterior_wall_uninsulated
+            {% elif 0.10 <= k <= 0.18 %}exterior_wall_insulated
+            {% else %}unknown{% endif %}
+          {% endif %}
+
+      cal_tsurf_est:
+        friendly_name: "Estimated T_surf (°C)"
+        unit_of_measurement: '°C'
+        value_template: >-
+          {% set Ti = states('sensor.cal_ti_resolved') | float %}
+          {% set Te = states('sensor.cal_te_resolved') | float %}
+          {% set k = states('input_number.cal_k_current') | float %}
+          {{ (Ti - k*(Ti-Te)) | round(2) }}
+      cal_tstick_pred:
+        friendly_name: "Predicted T_stick (°C)"
+        unit_of_measurement: '°C'
+        value_template: >-
+          {% set Ti = states('sensor.cal_ti_resolved') | float %}
+          {% set Ts = states('sensor.cal_tsurf_est') | float %}
+          {% set w = states('input_number.cal_w_current') | float %}
+          {{ (w*Ts + (1-w)*Ti) | round(2) }}
+
+# --------------------------------------------------
+# AUTOMATIONS — CALCULATE / SAVE / RESET
+# --------------------------------------------------
+automation:
+  - id: cal_calculate
+    alias: Calibration – CALCULATE
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_boolean.cal_btn_calculate
+        to: 'on'
+    action:
+      - variables:
+          mode: "{{ states('input_text.cal_surface_mode') }}"
+          lam: "{{ states('input_number.cal_lambda') | float }}"
+          k_cur: "{{ states('input_number.cal_k_current') | float }}"
+          w_cur: "{{ states('input_number.cal_w_current') | float }}"
+          k_meas: "{{ states('sensor.cal_k_meas') }}"
+          w_meas: "{{ states('sensor.cal_w_meas') }}"
+          k_preset: "{{ states('sensor.cal_preset_k_value') | float }}"
+          w_preset: "{{ states('sensor.cal_preset_w_value') | float }}"
+      - choose:
+          - conditions: "{{ mode == 'laser' and k_meas not in ['unknown','unavailable'] and w_meas not in ['unknown','unavailable'] }}"
+            sequence:
+              - variables:
+                  k_new: "{{ ( (1 - lam)*k_cur + lam*(k_meas | float) ) | round(3) }}"
+                  w_new: "{{ ( (1 - lam)*w_cur + lam*(w_meas | float) ) | round(3) }}"
+              - service: input_number.set_value
+                data: { value: "{{ k_new }}" }
+                target: { entity_id: input_number.cal_k_current }
+              - service: input_number.set_value
+                data: { value: "{{ w_new }}" }
+                target: { entity_id: input_number.cal_w_current }
+              - service: input_text.set_value
+                data: { value: laser }
+                target: { entity_id: input_text.cal_source_k }
+              - service: input_text.set_value
+                data: { value: laser }
+                target: { entity_id: input_text.cal_source_w }
+          - conditions: "{{ mode == 'preset' }}"
+            sequence:
+              - service: input_number.set_value
+                data: { value: "{{ k_preset | round(3) }}" }
+                target: { entity_id: input_number.cal_k_current }
+              - service: input_number.set_value
+                data: { value: "{{ w_preset | round(3) }}" }
+                target: { entity_id: input_number.cal_w_current }
+              - service: input_text.set_value
+                data: { value: preset }
+                target: { entity_id: input_text.cal_source_k }
+              - service: input_text.set_value
+                data: { value: preset }
+                target: { entity_id: input_text.cal_source_w }
+      - service: input_text.set_value
+        data:
+          value: "{{ now().isoformat() }}"
+        target:
+          entity_id: input_text.cal_last_update
+      - delay: 00:00:01
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.cal_btn_calculate
+
+  - id: cal_save_to_location
+    alias: Calibration – SAVE to Location
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_boolean.cal_btn_save
+        to: 'on'
+    action:
+      - variables:
+          loc: "{{ states('input_select.cal_location') }}"
+          store: "{{ states('input_text.cal_locations_store') }}"
+          k: "{{ states('input_number.cal_k_current') | float }}"
+          w: "{{ states('input_number.cal_w_current') | float }}"
+          sk: "{{ states('input_text.cal_source_k') }}"
+          sw: "{{ states('input_text.cal_source_w') }}"
+          ts: "{{ states('input_text.cal_last_update') }}"
+          Ti: "{{ states('sensor.cal_ti_resolved') | float }}"
+          Te: "{{ states('sensor.cal_te_resolved') | float }}"
+          RH: "{{ states('sensor.cal_rh_resolved') | float }}"
+          Tstick: "{{ states('sensor.cal_tstick_resolved') | float }}"
+          TIR: "{{ states('sensor.cal_tir_resolved') | float }}"
+      - service: input_text.set_value
+        target: { entity_id: input_text.cal_locations_store }
+        data:
+          value: >-
+            {% set MAXH = 20 %}
+            {% set data = store | default('{}') | from_json %}
+            {% set item = data.get(loc, {}) %}
+            {% set hist = item.get('history', []) %}
+            {% set newrec = {
+              'ts': ts,
+              'Ti': Ti,
+              'Te': Te,
+              'RH': RH,
+              'Tstick': Tstick,
+              'TIR': TIR,
+              'k': k,
+              'w': w,
+              'source_k': sk,
+              'source_w': sw
+            } %}
+            {% set hist2 = ([newrec] + hist)[:MAXH] %}
+            {% set newitem = {
+              'k': k,
+              'w': w,
+              'source_k': sk,
+              'source_w': sw,
+              'updated': ts,
+              'history': hist2
+            } %}
+            {% set data = dict(data, **{loc: newitem}) %}
+            {{ data | to_json }}
+      - delay: 00:00:01
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.cal_btn_save
+
+  - id: cal_reset_location
+    alias: Calibration – RESET Location
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_boolean.cal_btn_reset_location
+        to: 'on'
+    action:
+      - variables:
+          loc: "{{ states('input_select.cal_location') }}"
+          store: "{{ states('input_text.cal_locations_store') }}"
+      - service: input_text.set_value
+        target: { entity_id: input_text.cal_locations_store }
+        data:
+          value: >-
+            {% set data = store | default('{}') | from_json %}
+            {% do data.pop(loc, None) %}
+            {{ data | to_json }}
+      - service: input_number.set_value
+        target: { entity_id: input_number.cal_k_current }
+        data: { value: 0.4 }
+      - service: input_number.set_value
+        target: { entity_id: input_number.cal_w_current }
+        data: { value: 0.8 }
+      - service: input_text.set_value
+        target: { entity_id: input_text.cal_source_k }
+        data: { value: '' }
+      - service: input_text.set_value
+        target: { entity_id: input_text.cal_source_w }
+        data: { value: '' }
+      - service: input_text.set_value
+        target: { entity_id: input_text.cal_last_update }
+        data: { value: '' }
+      - delay: 00:00:01
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.cal_btn_reset_location
+
