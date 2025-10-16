@@ -1,0 +1,56 @@
+
+
+title: Calibration
+views:
+- title: Calibration
+path: calibration
+cards:
+- type: entities
+title: Location & Mode
+entities:
+- input_select.cal_location
+- input_text.cal_surface_mode
+- input_text.cal_surface_preset
+- input_text.cal_mount_preset
+- input_number.cal_lambda
+- type: entities
+title: Inputs – Entities (optional)
+entities:
+- input_text.cal_entity_ti
+- input_text.cal_entity_te
+- input_text.cal_entity_rh
+- input_text.cal_entity_tstick
+- input_text.cal_entity_tir
+- type: entities
+title: Inputs – Manual values
+entities:
+- input_number.cal_ti_manual
+- input_number.cal_te_manual
+- input_number.cal_rh_manual
+- input_number.cal_tstick_manual
+- input_number.cal_tir_manual
+- type: entities
+title: Actions
+entities:
+- input_boolean.cal_btn_calculate
+- input_boolean.cal_btn_save
+- input_boolean.cal_btn_reset_location
+- type: entities
+title: Results & State
+entities:
+- entity: input_number.cal_k_current
+name: k (current)
+- entity: input_number.cal_w_current
+name: w (current)
+- input_text.cal_source_k
+- input_text.cal_source_w
+- input_text.cal_last_update
+- sensor.cal_k_meas
+- sensor.cal_w_meas
+- sensor.cal_surface_guess
+- sensor.cal_tsurf_est
+- sensor.cal_tstick_pred
+- type: entities
+title: Store (per location JSON)
+entities:
+- input_text.cal_locations_store
