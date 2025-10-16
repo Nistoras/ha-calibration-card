@@ -31,3 +31,14 @@
 # =============================
 # 2) Create file: /config/packages/calibration_package.yaml
 # =============================
+
+
+# --------------------------------------------------
+# OPTIONAL: Lovelace Dashboard View (copy into a YAML-mode view)
+# --------------------------------------------------
+# Create a new dashboard (Settings → Dashboards → + Add → YAML mode),
+# point it to /config/dashboards/calibration-dashboard.yaml and paste the section below there.
+
+
+# --- FILE: /config/dashboards/calibration-dashboard.yaml ---
+# Paste the content below into /config/dashboards/calibration-dashboard.yaml (uncommented)
